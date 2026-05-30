@@ -1,27 +1,28 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { supabase } from '@/lib/supabase';
 
-const prisma = new PrismaClient();
-
-// Atualiza um cliente (EDITAR)
 export async function PUT(
-  request: Request, 
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
     const data = await request.json();
-    
-    const atualizado = await prisma.cliente.update({
-      where: { id: id },
-      data: {
+    const isOficina = data.motos?.includes('Oficina') || false;
+
+    const { data: atualizado, error } = await supabase
+      .from('Cliente')
+      .update({
         nome: data.nome,
         telefone: data.telefone,
         whatsapp: data.whatsapp,
         motos: data.motos,
-      }
-    });
-    
+        isOficina
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
     return NextResponse.json(atualizado);
   } catch (error) {
     console.error(error);
@@ -29,18 +30,19 @@ export async function PUT(
   }
 }
 
-// Exclui um cliente (DELETAR)
 export async function DELETE(
-  request: Request, 
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    
-    await prisma.cliente.delete({
-      where: { id: id }
-    });
-    
+
+    const { error } = await supabase
+      .from('Cliente')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(error);

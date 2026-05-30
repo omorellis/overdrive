@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { supabase } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    const estoque = await prisma.produtoEstoque.findMany({
-      orderBy: { nome: 'asc' }
-    });
-    return NextResponse.json(estoque);
+    const { data, error } = await supabase
+      .from('ProdutoEstoque')
+      .select('*')
+      .order('nome', { ascending: true });
+    if (error) throw error;
+    return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao buscar estoque' }, { status: 500 });
   }
@@ -17,16 +17,18 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const novo = await prisma.produtoEstoque.create({
-      data: {
+    const { data: novo, error } = await supabase
+      .from('ProdutoEstoque')
+      .insert([{
         nome: data.nome,
         codigo: data.codigo,
         categoria: data.categoria,
         quantidade: Number(data.quantidade),
         precoCusto: Number(data.precoCusto) || 0,
         precoVenda: Number(data.precoVenda) || 0,
-      }
-    });
+      }])
+      .select();
+    if (error) throw error;
     return NextResponse.json(novo);
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao criar produto' }, { status: 500 });

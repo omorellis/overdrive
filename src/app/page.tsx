@@ -118,7 +118,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {dados?.ultimasOS.map((os: any) => (
+                {dados?.ultimasOS && dados.ultimasOS.length > 0 ? dados.ultimasOS.map((os: any) => (
                   <tr key={os.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors">
                     <td className="p-4">
                       <p className="font-bold text-zinc-100">{os.equipamento}</p>
@@ -139,7 +139,7 @@ export default function DashboardPage() {
                       {new Date(os.updatedAt).toLocaleDateString()}
                     </td>
                   </tr>
-                ))}
+                )) : <tr><td colSpan={3} className="p-4 text-center text-zinc-500">Sem ordens de serviço</td></tr>}
               </tbody>
             </table>
           </div>

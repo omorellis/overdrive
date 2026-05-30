@@ -1,20 +1,25 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { supabase } from '@/lib/supabase';
 
 export async function PUT(request: Request) {
   try {
     const { novaSenha } = await request.json();
-    const usuario = await prisma.usuario.findFirst();
-    
-    if (!usuario) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+    const { data: usuarios, error: fetchError } = await supabase
+      .from('Usuario')
+      .select('*')
+      .limit(1);
 
-    await prisma.usuario.update({
-      where: { id: usuario.id },
-      data: { senha: novaSenha }
-    });
+    if (fetchError || !usuarios || usuarios.length === 0) {
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+    }
 
+    const usuario = usuarios[0];
+    const { error } = await supabase
+      .from('Usuario')
+      .update({ senha: novaSenha })
+      .eq('id', usuario.id);
+
+    if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao mudar senha' }, { status: 500 });

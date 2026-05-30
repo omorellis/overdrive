@@ -1,36 +1,39 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { supabase } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    // 1. Total de Clientes
-    const clientesTotal = await prisma.cliente.count();
+    const { count: clientesTotal } = await supabase
+      .from('Cliente')
+      .select('*', { count: 'exact', head: true });
 
-    // 2. Faturamento (Soma de todos os Orçamentos/Notas geradas)
-    const orcamentos = await prisma.orcamento.findMany();
-    const faturamentoTotal = orcamentos.reduce((acc, curr) => acc + curr.total, 0);
+    const { data: orcamentos } = await supabase
+      .from('Orcamento')
+      .select('total');
+    const faturamentoTotal = orcamentos?.reduce((acc: number, curr: any) => acc + (curr.total || 0), 0) || 0;
 
-    // 3. Status das Ordens de Serviço (Ativas vs Entregues)
-    const osAtivas = await prisma.ordemServico.count({
-      where: { status: { not: 'ENTREGUE' } }
-    });
-    const osEntregues = await prisma.ordemServico.count({
-      where: { status: 'ENTREGUE' }
-    });
+    const { count: osAtivas } = await supabase
+      .from('OrdemServico')
+      .select('*', { count: 'exact', head: true })
+      .neq('status', 'ENTREGUE');
 
-    // 4. Alerta de Estoque Baixo (Peças com 5 ou menos unidades)
-    const estoqueBaixo = await prisma.produtoEstoque.count({
-      where: { quantidade: { lte: 5 } }
-    });
+    const { count: osEntregues } = await supabase
+      .from('OrdemServico')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'ENTREGUE');
 
-    // 5. Últimas movimentações de OS na bancada (Para a tabela recente)
-    const ultimasOS = await prisma.ordemServico.findMany({
-      take: 5,
-      orderBy: { updatedAt: 'desc' },
-      include: { cliente: true }
-    });
+    const { count: estoqueBaixo } = await supabase
+      .from('ProdutoEstoque')
+      .select('*', { count: 'exact', head: true })
+      .lte('quantidade', 5);
+
+    const { data: ultimasOS, error: osError } = await supabase
+      .from('OrdemServico')
+      .select('*, Cliente(*)')
+      .order('updatedAt', { ascending: false })
+      .limit(5);
+
+    if (osError) throw osError;
 
     return NextResponse.json({
       clientesTotal,
@@ -38,9 +41,10 @@ export async function GET() {
       osAtivas,
       osEntregues,
       estoqueBaixo,
-      ultimasOS
+      ultimasOS: ultimasOS || []
     });
   } catch (error) {
+    console.error('Dashboard error:', error);
     return NextResponse.json({ error: 'Erro ao buscar dados do dashboard' }, { status: 500 });
   }
 }

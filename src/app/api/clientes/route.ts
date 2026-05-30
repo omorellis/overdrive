@@ -1,32 +1,33 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { supabase } from '@/lib/supabase';
 
 export async function GET() {
-  try {
-    const clientes = await prisma.cliente.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-    return NextResponse.json(clientes);
-  } catch (error) {
-    return NextResponse.json({ error: 'Erro ao buscar clientes' }, { status: 500 });
-  }
+  const { data, error } = await supabase.from('Cliente').select('*');
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
 }
 
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    const novoCliente = await prisma.cliente.create({
-      data: {
-        nome: data.nome,
-        telefone: data.telefone,
-        whatsapp: data.whatsapp,
-        motos: data.motos,
-      }
-    });
-    return NextResponse.json(novoCliente);
-  } catch (error) {
-    return NextResponse.json({ error: 'Erro ao criar cliente' }, { status: 500 });
+    const body = await request.json();
+    const isOficina = body.motos?.includes('Oficina') || false;
+
+    const { data, error } = await supabase.from('Cliente').insert([{
+      nome: body.nome,
+      telefone: body.telefone,
+      whatsapp: body.whatsapp,
+      motos: body.motos,
+      isOficina
+    }]).select();
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return NextResponse.json({ error: error.message, details: error }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error('Catch error:', err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

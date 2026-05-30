@@ -1,28 +1,27 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { supabase } from '@/lib/supabase';
 
-const prisma = new PrismaClient();
-
-// Atualiza uma pinagem existente (EDITAR)
 export async function PUT(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> } // Atualizado para o Next.js 16
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params; // Aguarda o ID ser resolvido
+    const { id } = await params;
     const data = await request.json();
-    
-    const atualizado = await prisma.pinagemPainel.update({
-      where: { id: id },
-      data: {
+
+    const { data: atualizado, error } = await supabase
+      .from('PinagemPainel')
+      .update({
         marca: data.marca,
         moto: data.moto,
         anoInicio: Number(data.anoInicio),
         anoFim: Number(data.anoFim),
         pinos: JSON.stringify(data.pinos),
-      }
-    });
-    
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
     return NextResponse.json(atualizado);
   } catch (error) {
     console.error(error);
@@ -30,18 +29,19 @@ export async function PUT(
   }
 }
 
-// Exclui uma pinagem (DELETAR)
 export async function DELETE(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> } // Atualizado para o Next.js 16
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params; // Aguarda o ID ser resolvido
-    
-    await prisma.pinagemPainel.delete({
-      where: { id: id }
-    });
-    
+    const { id } = await params;
+
+    const { error } = await supabase
+      .from('PinagemPainel')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(error);
