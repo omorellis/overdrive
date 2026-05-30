@@ -16,6 +16,7 @@ export async function PUT(
         moto: data.moto,
         anoInicio: Number(data.anoInicio),
         anoFim: Number(data.anoFim),
+        direcao: data.direcao ?? 'ltr',
         pinos: JSON.stringify(data.pinos),
       })
       .eq('id', id)

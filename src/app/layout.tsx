@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Wrench, Users, FileText, Cpu, Package, Layers, Activity, Settings, LogOut, Menu, X } from "lucide-react";
+import { Users, FileText, Cpu, Package, Layers, Activity, Settings, LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [montado, setMontado] = useState(false); // Estado novo para evitar erro de Hydration
-  const [logado, setLogado] = useState(false);
+  const [logado, setLogado] = useState<boolean>(() => typeof window !== 'undefined' && Boolean(localStorage.getItem("overdrive_session")));
   const [username, setUsername] = useState("");
   const [senhaInput, setSenhaInput] = useState("");
   const [erro, setErro] = useState("");
@@ -19,9 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   // Lê o localStorage apenas após a tela montar no cliente
   useEffect(() => {
-    const session = localStorage.getItem("overdrive_session");
-    if (session) setLogado(true);
-    setMontado(true); // Avisa que o React terminou de carregar
+    setTimeout(() => setMontado(true), 0);
   }, []);
 
   useEffect(() => {
@@ -185,7 +183,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="w-8"></div>
               </header>
 
-              <main className="flex-1 overflow-y-auto bg-zinc-950 p-4 md:p-0 relative">
+              <main className="flex-1 overflow-y-auto bg-zinc-950 p-4 pb-8 md:p-0 md:pb-0 relative">
                 {children}
               </main>
             </div>

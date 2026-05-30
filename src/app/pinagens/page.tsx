@@ -15,6 +15,17 @@ const OPCOES_FUNCAO = [
   "Luz de Injeção (FI)", "Luz de Óleo", "Luz de ABS", "Luz de Temperatura", "Iluminação do Painel"
 ];
 
+type PinoMapeado = { pino: number; funcao: string };
+type Pinagem = {
+  id: string;
+  marca: string;
+  moto: string;
+  anoInicio: number;
+  anoFim: number;
+  direcao: 'ltr' | 'rtl';
+  pinos: PinoMapeado[];
+};
+
 // Mágica das Cores Técnicas
 const getPinoCor = (funcao: string) => {
   if (funcao === 'Não identificado') 
@@ -40,7 +51,7 @@ const getPinoCor = (funcao: string) => {
 };
 
 export default function PinagensPage() {
-  const [pinagens, setPinagens] = useState<any[]>([]);
+  const [pinagens, setPinagens] = useState<Pinagem[]>([]);
   const [busca, setBusca] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -52,14 +63,19 @@ export default function PinagensPage() {
   const [anoInicio, setAnoInicio] = useState('');
   const [anoFim, setAnoFim] = useState('');
   const [qtdPinos, setQtdPinos] = useState(16);
-  const [listaPinos, setListaPinos] = useState<{ pino: number; funcao: string }[]>([]);
+  const [direcao, setDirecao] = useState<'ltr' | 'rtl'>('ltr');
+  const [listaPinos, setListaPinos] = useState<PinoMapeado[]>(() =>
+    Array.from({ length: 16 }, (_, i) => ({
+      pino: i + 1,
+      funcao: 'Não identificado'
+    }))
+  );
 
   useEffect(() => {
-    if (listaPinos.length === 0) gerarPinos(16);
     fetchPinagens();
   }, []);
 
-  const fetchPinagens = async () => {
+  async function fetchPinagens() {
     try {
       const res = await fetch('/api/pinagens');
       const data = await res.json();
@@ -67,20 +83,20 @@ export default function PinagensPage() {
     } catch (err) {
       console.error("Erro ao buscar pinagens", err);
     }
-  };
+  }
 
   const handleQtdPinosChange = (novaQtd: number) => {
     setQtdPinos(novaQtd);
     if (!modoEdicao) gerarPinos(novaQtd);
   };
 
-  const gerarPinos = (qtd: number) => {
+  function gerarPinos(qtd: number) {
     const novos = Array.from({ length: qtd }, (_, i) => ({
       pino: i + 1,
       funcao: 'Não identificado'
     }));
     setListaPinos(novos);
-  };
+  }
 
   const handlePinoChange = (index: number, valor: string) => {
     const atualizados = [...listaPinos];
@@ -88,11 +104,21 @@ export default function PinagensPage() {
     setListaPinos(atualizados);
   };
 
+  const organizarPinos = (pinos: PinoMapeado[], direcao: 'ltr' | 'rtl') => {
+    if (direcao === 'ltr') return pinos;
+    const colunas = Math.ceil(pinos.length / 2);
+    const linhas: PinoMapeado[][] = [];
+    for (let i = 0; i < pinos.length; i += colunas) {
+      linhas.push(pinos.slice(i, i + colunas));
+    }
+    return linhas.flatMap(linha => [...linha].reverse());
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const payload = { marca, moto, anoInicio, anoFim, pinos: listaPinos };
+    const payload = { marca, moto, anoInicio, anoFim, direcao, pinos: listaPinos };
 
     try {
       if (modoEdicao && idEdicao) {
@@ -119,7 +145,7 @@ export default function PinagensPage() {
     setLoading(false);
   };
 
-  const editarPinagem = (pina: any) => {
+  const editarPinagem = (pina: Pinagem) => {
     setModoEdicao(true);
     setIdEdicao(pina.id);
     setMarca(pina.marca);
@@ -127,6 +153,7 @@ export default function PinagensPage() {
     setAnoInicio(pina.anoInicio.toString());
     setAnoFim(pina.anoFim.toString());
     setQtdPinos(pina.pinos.length);
+    setDirecao(pina.direcao ?? 'ltr');
     setListaPinos(JSON.parse(JSON.stringify(pina.pinos)));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -138,7 +165,7 @@ export default function PinagensPage() {
         if (!res.ok) return alert(`Erro ao excluir.`);
         fetchPinagens();
         if (id === idEdicao) resetarFormulario();
-      } catch (error) {
+      } catch {
         alert("Falha de rede ao tentar excluir.");
       }
     }
@@ -151,6 +178,7 @@ export default function PinagensPage() {
     setMoto('');
     setAnoInicio('');
     setAnoFim('');
+    setDirecao('ltr');
     setQtdPinos(16);
     gerarPinos(16);
   };
@@ -223,6 +251,15 @@ export default function PinagensPage() {
                     disabled={modoEdicao}
                     className="w-full p-2.5 border border-zinc-700 rounded-lg bg-zinc-950 text-zinc-100 outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 transition-all" />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">Direção da Pinagem</label>
+                  <select value={direcao} onChange={e => setDirecao(e.target.value as 'ltr' | 'rtl')}
+                    className="w-full p-2.5 border border-zinc-700 rounded-lg bg-zinc-950 text-zinc-100 outline-none focus:ring-1 focus:ring-emerald-500 transition-all">
+                    <option value="ltr">Da esquerda para a direita</option>
+                    <option value="rtl">Da direita para a esquerda</option>
+                  </select>
+                </div>
               </div>
 
               <div className="pt-4 border-t border-zinc-800">
@@ -282,28 +319,30 @@ export default function PinagensPage() {
                   </div>
                 </div>
 
-                <div className="p-6 bg-zinc-950/30 flex flex-col items-center overflow-x-auto">
+                <div className="p-6 bg-zinc-950/30 flex flex-col items-center overflow-x-auto px-4">
                   <p className="text-[10px] font-bold text-zinc-500 mb-3 uppercase tracking-[0.2em]">Conector Frontal (Olhando o Painel)</p>
                   
                   <div className="w-20 h-4 bg-zinc-600 rounded-t-lg border-t-2 border-l-2 border-r-2 border-zinc-500"></div>
                   
                   <div className="bg-zinc-800 p-4 rounded-b-xl rounded-tr-xl rounded-tl-xl border-2 border-zinc-600 shadow-inner">
                     <div 
-                      className="grid gap-2.5" 
-                      style={{ gridTemplateColumns: `repeat(${Math.ceil(pina.pinos.length / 2)}, minmax(0, 1fr))` }}
+                      className="grid gap-2.5 min-w-full"
+                      style={{ gridTemplateColumns: `repeat(${Math.ceil(pina.pinos.length / 2)}, minmax(3rem, 1fr))` }}
                     >
-                      {pina.pinos.map((p: any) => (
+                      {organizarPinos(pina.pinos, pina.direcao ?? 'ltr').map((p: PinoMapeado) => (
                         <div 
-                          key={p.pino} 
+                          key={`${p.pino}-${p.funcao}`}
                           title={p.funcao}
-                          className={`w-14 h-14 flex flex-col items-center justify-center border-2 rounded-lg font-bold cursor-help transition-all shadow-sm ${getPinoCor(p.funcao)}`}
+                          className={`min-h-[3rem] flex flex-col items-center justify-center border-2 rounded-lg font-bold cursor-help transition-all shadow-sm ${getPinoCor(p.funcao)}`}
                         >
                           <span className="text-lg">{p.pino}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <p className="text-xs text-zinc-500 mt-4">*Esquerda para a direita (Pino 1 no canto superior esquerdo).</p>
+                  <p className="text-xs text-zinc-500 mt-4">
+                    *Direção: {pina.direcao === 'rtl' ? 'Da direita para a esquerda' : 'Da esquerda para a direita'}.
+                  </p>
                 </div>
               </div>
             ))}

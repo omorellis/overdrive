@@ -10,10 +10,11 @@ export async function GET() {
     if (error) throw error;
     const formatadas = data?.map(p => ({
       ...p,
+      direcao: p.direcao ?? 'ltr',
       pinos: typeof p.pinos === 'string' ? JSON.parse(p.pinos) : p.pinos
     })) || [];
     return NextResponse.json(formatadas);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Erro ao buscar pinagens' }, { status: 500 });
   }
 }
@@ -28,12 +29,13 @@ export async function POST(request: Request) {
         moto: data.moto,
         anoInicio: Number(data.anoInicio),
         anoFim: Number(data.anoFim),
+        direcao: data.direcao ?? 'ltr',
         pinos: JSON.stringify(data.pinos),
       }])
       .select();
     if (error) throw error;
     return NextResponse.json(novaPinagem);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Erro ao salvar pinagem' }, { status: 500 });
   }
 }

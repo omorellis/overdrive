@@ -34,6 +34,7 @@ CREATE TABLE "PinagemPainel" (
   "moto" text NOT NULL,
   "anoInicio" integer NOT NULL,
   "anoFim" integer NOT NULL,
+  "direcao" text NOT NULL DEFAULT 'ltr',
   "pinos" text NOT NULL,
   "createdAt" timestamp NOT NULL DEFAULT NOW()
 );
