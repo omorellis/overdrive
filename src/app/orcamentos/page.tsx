@@ -7,15 +7,15 @@ import { Plus, Trash2, Printer, FileText, Save, X } from 'lucide-react';
 export default function OrcamentosPage() {
   const [clientes, setClientes] = useState<any[]>([]);
   const [orcamentosSalvos, setOrcamentosSalvos] = useState<any[]>([]);
+  const [oficinaConfig, setOficinaConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const [modoEdicao, setModoEdicao] = useState(false);
   const [idEdicao, setIdEdicao] = useState<string | null>(null);
 
-  const [oficinaConfig, setOficinaConfig] = useState<any>(null);
-
   const [clienteId, setClienteId] = useState('');
   const [tipoDocumento, setTipoDocumento] = useState('ORÇAMENTO');
+  const [veiculoManual, setVeiculoManual] = useState(''); // NOVO: Campo livre para a moto na nota
   const [itens, setItens] = useState([{ descricao: '', preco: 0 }]);
 
   const componentRef = useRef<HTMLDivElement>(null);
@@ -31,15 +31,14 @@ export default function OrcamentosPage() {
     setClientes(await res.json());
   };
 
-  // E crie a função de fetch logo abaixo das outras:
-const fetchOficinaConfig = async () => {
-  const res = await fetch('/api/configuracao');
-  setOficinaConfig(await res.json());
-};
-
   const fetchOrcamentos = async () => {
     const res = await fetch('/api/orcamentos');
     setOrcamentosSalvos(await res.json());
+  };
+
+  const fetchOficinaConfig = async () => {
+    const res = await fetch('/api/configuracao');
+    setOficinaConfig(await res.json());
   };
 
   const adicionarItem = () => setItens([...itens, { descricao: '', preco: 0 }]);
@@ -51,7 +50,10 @@ const fetchOficinaConfig = async () => {
   };
 
   const valorTotal = itens.reduce((acc, item) => acc + (Number(item.preco) || 0), 0);
+  
+  // Detalhe importante: se tiver veículo preenchido na nota, usa ele. Senão, puxa o padrão do cliente.
   const clienteSelecionado = clientes.find(c => c.id === clienteId);
+  const veiculoExibicao = veiculoManual || clienteSelecionado?.motos || '---';
 
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
@@ -64,22 +66,27 @@ const fetchOficinaConfig = async () => {
 
     setLoading(true);
     try {
-      const payload = { clienteId, tipo: tipoDocumento, total: valorTotal, itens };
+      // Adicionamos o veículo manual nas observações do payload para o banco
+      const payload = { 
+        clienteId, 
+        tipo: tipoDocumento, 
+        total: valorTotal, 
+        itens,
+        observacoes: veiculoManual // Usando o campo observações existente para guardar a moto
+      };
 
       if (modoEdicao && idEdicao) {
-        const res = await fetch(`/api/orcamentos/${idEdicao}`, {
+        await fetch(`/api/orcamentos/${idEdicao}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error("Erro ao atualizar");
       } else {
-        const res = await fetch('/api/orcamentos', {
+        await fetch('/api/orcamentos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error("Erro ao salvar novo");
       }
       
       fetchOrcamentos();
@@ -96,6 +103,7 @@ const fetchOficinaConfig = async () => {
     setIdEdicao(orc.id);
     setClienteId(orc.clienteId);
     setTipoDocumento(orc.tipo);
+    setVeiculoManual(orc.observacoes || '');
     try {
       setItens(JSON.parse(orc.itens));
     } catch (e) {
@@ -108,6 +116,7 @@ const fetchOficinaConfig = async () => {
     setModoEdicao(false);
     setIdEdicao(null);
     setClienteId('');
+    setVeiculoManual('');
     setTipoDocumento('ORÇAMENTO');
     setItens([{ descricao: '', preco: 0 }]);
   };
@@ -134,12 +143,12 @@ const fetchOficinaConfig = async () => {
         <h1 className="text-3xl font-bold flex items-center gap-3">
           <FileText className="text-emerald-500" size={32} /> Orçamentos e Notas
         </h1>
-        <p className="text-zinc-400 mt-1">Gere PDFs com sua identidade visual oficial.</p>
+        <p className="text-zinc-400 mt-1">Gere PDFs com controle total sobre as motos e serviços.</p>
       </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         
-        {/* FORMULÁRIO DO SISTEMA (Mantém o verde pois é o sistema) */}
+        {/* FORMULÁRIO */}
         <div className="xl:col-span-5 h-fit space-y-6">
           <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-xl relative">
             {modoEdicao && (
@@ -164,13 +173,26 @@ const fetchOficinaConfig = async () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1.5">Cliente</label>
+                  <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1.5">Cliente / Oficina</label>
                   <select value={clienteId} onChange={e => setClienteId(e.target.value)}
                     className="w-full p-2.5 border border-zinc-700 rounded-lg bg-zinc-950 outline-none focus:border-emerald-500">
                     <option value="">Selecione...</option>
-                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nome} {c.motos ? `(${c.motos})` : ''}</option>)}
+                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                   </select>
                 </div>
+              </div>
+
+              {/* NOVO: Campo para especificar a moto da nota corrente */}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1.5">Moto / Veículo desta Nota</label>
+                <input 
+                  type="text" 
+                  value={veiculoManual} 
+                  onChange={e => setVeiculoManual(e.target.value)} 
+                  placeholder="Ex: Titan 160 Vermelha - Placa XYZ-999"
+                  className="w-full p-2.5 border border-zinc-700 rounded-lg bg-zinc-950 text-zinc-100 outline-none focus:border-emerald-500 text-sm" 
+                />
+                <p className="text-[10px] text-zinc-500 mt-1">Essencial para oficinas parceiras que mandam várias motos diferentes.</p>
               </div>
 
               <div className="pt-4 border-t border-zinc-800">
@@ -178,14 +200,14 @@ const fetchOficinaConfig = async () => {
                 <div className="space-y-3 mb-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                   {itens.map((item, idx) => (
                     <div key={idx} className="flex items-center gap-2 bg-zinc-950/50 p-2 rounded-lg border border-zinc-800">
-                      <input type="text" placeholder="Descrição (Ex: Reparo Painel)" value={item.descricao} 
+                      <input type="text" placeholder="Descrição (Ex: Reparo de Display)" value={item.descricao} 
                         onChange={e => atualizarItem(idx, 'descricao', e.target.value)}
-                        className="flex-1 p-2 border-none bg-transparent outline-none text-zinc-200" />
+                        className="flex-1 p-2 border-none bg-transparent outline-none text-zinc-200 text-sm" />
                       <div className="flex items-center gap-1 border-l border-zinc-700 pl-2">
-                        <span className="text-zinc-500 font-bold">R$</span>
+                        <span className="text-zinc-500 font-bold text-sm">R$</span>
                         <input type="number" placeholder="0,00" value={item.preco || ''} 
                           onChange={e => atualizarItem(idx, 'preco', Number(e.target.value))}
-                          className="w-20 p-2 border-none bg-transparent outline-none text-emerald-400 font-bold" />
+                          className="w-20 p-2 border-none bg-transparent outline-none text-emerald-400 font-bold text-sm" />
                       </div>
                       <button onClick={() => removerItem(idx)} disabled={itens.length === 1} className="p-2 text-red-500 hover:bg-zinc-800 rounded disabled:opacity-30">
                         <Trash2 size={18} />
@@ -216,6 +238,7 @@ const fetchOficinaConfig = async () => {
             </div>
           </div>
 
+          {/* HISTÓRICO */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-xl">
             <h2 className="text-lg font-semibold mb-4">Histórico Recente</h2>
             <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
@@ -226,6 +249,7 @@ const fetchOficinaConfig = async () => {
                       {orc.tipo}
                     </span>
                     <p className="text-sm font-medium mt-1">{orc.cliente?.nome}</p>
+                    {orc.observacoes && <p className="text-[11px] text-zinc-500 mt-0.5 italic">{orc.observacoes}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-zinc-300 mr-2">{formatarMoeda(orc.total)}</span>
@@ -239,32 +263,19 @@ const fetchOficinaConfig = async () => {
           </div>
         </div>
 
-        {/* PREVIEW DO PDF TOTALMENTE CINZA/PRETO */}
+        {/* PREVIEW DO PDF */}
         <div className="xl:col-span-7 bg-zinc-800/30 p-8 rounded-xl border border-zinc-800 flex justify-center overflow-x-auto">
           <div 
             ref={componentRef} 
             className="bg-white text-zinc-900 w-[210mm] min-h-[297mm] p-12 shadow-2xl relative"
             style={{ fontFamily: 'Arial, Helvetica, sans-serif', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
           >
-            {/* Borda inferor agora é cinza escura */}
             <div className="flex justify-between items-center mb-10 pb-6 border-b-2 border-zinc-800">
-              
               <div>
-                <img 
-                  src="/logo-clara.png" 
-                  alt="OverDrive Custom Logo" 
-                  className="h-20 max-w-[280px] object-contain" 
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
+                <img src="/logo-clara.png" alt="OverDrive Custom Logo" className="h-20 max-w-[280px] object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
               </div>
-
               <div className="text-right">
-                {/* Título unificado no tom cinza */}
-                <h2 className="text-3xl font-black uppercase tracking-widest text-zinc-500">
-                  {tipoDocumento}
-                </h2>
+                <h2 className="text-3xl font-black uppercase tracking-widest text-zinc-500">{tipoDocumento}</h2>
                 <p className="text-zinc-600 font-bold tracking-wider mt-1">#{numeroDoc}</p>
                 <p className="text-zinc-500 text-xs mt-1">Data: {dataHoje}</p>
               </div>
@@ -274,19 +285,21 @@ const fetchOficinaConfig = async () => {
               <div className="flex-1 bg-zinc-50 p-5 rounded-lg border border-zinc-200">
                 <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest mb-3 border-b border-zinc-200 pb-2">Faturado Para</p>
                 <p className="font-bold text-zinc-900 text-lg uppercase">{clienteSelecionado?.nome || 'NÃO IDENTIFICADO'}</p>
-                <p className="text-sm text-zinc-600 mt-1">Contato: {clienteSelecionado?.whatsapp || clienteSelecionado?.telefone || '---'}</p>
-                <p className="text-sm text-zinc-600">Veículo: <span className="font-semibold text-zinc-800">{clienteSelecionado?.motos || '---'}</span></p>
+                <p className="text-sm text-zinc-600 mt-1">Contato: {clienteSelecionado?.whatsapp || '---'}</p>
+                
+                {/* DINÂMICO: Se você digitou a moto no campo livre, ela sai aqui de forma impecável */}
+                <p className="text-sm text-zinc-600">Veículo: <span className="font-bold text-zinc-900 uppercase">{veiculoExibicao}</span></p>
               </div>
               
-<div className="w-1/3 bg-zinc-900 p-5 rounded-lg text-zinc-100 flex flex-col justify-center">
-  <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest mb-1">Contato Oficina</p>
-  <p className="text-sm font-semibold">{oficinaConfig?.telefone || '(24) 99999-9999'}</p>
-  <p className="text-sm text-zinc-300 font-medium">{oficinaConfig?.instagram || '@overdrive.custom'}</p>
-  <p className="text-xs text-zinc-400 mt-2">
-    {oficinaConfig?.endereco || 'Rua da Oficina, 123'} <br />
-    {oficinaConfig?.cidadeEstado || 'Três Rios - RJ'}
-  </p>
-</div>
+              <div className="w-1/3 bg-zinc-900 p-5 rounded-lg text-zinc-100 flex flex-col justify-center">
+                <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest mb-1">Contato Oficina</p>
+                <p className="text-sm font-semibold">{oficinaConfig?.telefone || '(24) 99999-9999'}</p>
+                <p className="text-sm text-zinc-300 font-medium">{oficinaConfig?.instagram || '@overdrive.custom'}</p>
+                <p className="text-xs text-zinc-400 mt-2">
+                  {oficinaConfig?.endereco || 'Rua da Oficina, 123'}<br />
+                  {oficinaConfig?.cidadeEstado || 'Três Rios - RJ'}
+                </p>
+              </div>
             </div>
 
             <div className="mb-10 min-h-[300px]">
@@ -331,7 +344,6 @@ const fetchOficinaConfig = async () => {
               </div>
 
               <div className="w-2/5">
-                {/* Caixa de Total também padronizada no cinza */}
                 <div className="bg-zinc-100 border-2 border-zinc-400 rounded-xl p-5 text-center">
                   <p className="text-xs font-black uppercase text-zinc-600 tracking-widest mb-1">
                     {tipoDocumento === 'ORÇAMENTO' ? 'Total a Pagar' : 'Valor Total Pago'}
