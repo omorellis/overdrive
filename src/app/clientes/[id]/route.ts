@@ -1,36 +1,51 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { supabase } from '@/lib/supabase';
 
-const prisma = new PrismaClient();
-
-// Atualiza o cliente (Editar)
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const { id } = await params;
     const data = await request.json();
-    
-    const atualizado = await prisma.cliente.update({
-      where: { id },
-      data: {
+    const isOficina = data.motos?.includes('Oficina') || false;
+
+    const { data: atualizado, error } = await supabase
+      .from('Cliente')
+      .update({
         nome: data.nome,
-        whatsapp: data.whatsapp,
         telefone: data.telefone,
+        whatsapp: data.whatsapp,
         motos: data.motos,
-      }
-    });
+        isOficina
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
     return NextResponse.json(atualizado);
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: 'Erro ao atualizar cliente' }, { status: 500 });
   }
 }
 
-// Exclui o cliente
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const { id } = await params;
-    await prisma.cliente.delete({ where: { id } });
+
+    const { error } = await supabase
+      .from('Cliente')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: 'Erro ao deletar cliente' }, { status: 500 });
   }
 }
